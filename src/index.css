@@ -1,0 +1,58 @@
+@tailwindcss base;
+@tailwindcss components;
+@tailwindcss utilities;
+
+:root {
+  --background: #FFFFFF;
+  --foreground: #2B2B2B;
+  --card: #F5F5F5;
+  --card-foreground: #2B2B2B;
+  --border: #E5E5E5;
+  --accent: #D2D0C1;
+  --accent-foreground: #2B2B2B;
+  --muted: #E5E5E5;
+  --muted-foreground: #737373;
+  --font-sans: "Instrument Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Instrument Serif", ui-serif, Georgia, serif;
+}
+
+.dark {
+  --background: #2B2B2B;
+  --foreground: #FFFFFF;
+  --card: #333333;
+  --card-foreground: #FFFFFF;
+  --border: #444444;
+  --accent: #D2D0C1;
+  --accent-foreground: #2B2B2B;
+  --muted: #3D3D3D;
+  --muted-foreground: #A3A3A3;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  min-height: 100vh;
+  margin: 0;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.font-serif {
+  font-family: var(--font-serif);
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(160, 160, 160, 0.3);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(160, 160, 160, 0.5);
+}
