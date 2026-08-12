@@ -7,6 +7,7 @@ interface AuthContextType {
   isLoading: boolean;
   login: (email: string, pass: string) => Promise<{ success: boolean; message?: string }>;
   logout: () => void;
+  updatePassword: (currentPass: string, newPass: string) => Promise<{ success: boolean; message: string }>;
   requestPasswordReset: (email: string) => Promise<{ success: boolean; message: string }>;
 }
 
@@ -14,6 +15,8 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const SUPERADMIN_STORAGE_KEY = 'stockdine_superadmin_user';
 const TOKEN_KEY = 'stockdine_superadmin_token';
+const CUSTOM_PASS_KEY = 'stockdine_superadmin_custom_pass';
+const CUSTOM_EMAIL_KEY = 'stockdine_superadmin_custom_email';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<SuperAdminUser | null>(null);
@@ -41,58 +44,59 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (email: string, pass: string): Promise<{ success: boolean; message?: string }> => {
     setIsLoading(true);
     const cleanEmail = email.trim().toLowerCase();
-    const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+    const activeAdminEmail = (localStorage.getItem(CUSTOM_EMAIL_KEY) || 'subash15082007@gmail.com').toLowerCase();
+    const activeAdminPass = localStorage.getItem(CUSTOM_PASS_KEY) || '198088';
 
-    // 1. Try real backend API endpoints first
-    const endpoints = [
-      `${apiBase}/api/superadmin/login`,
-      `${apiBase}/api/auth/superadmin/login`
-    ];
-
-    for (const endpoint of endpoints) {
-      try {
-        const response = await fetch(endpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: cleanEmail, password: pass }),
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          if (data.token && (data.user?.role === 'superadmin' || data.user?.role === 'super_admin' || data.user?.role === 'admin' || data.role === 'superadmin')) {
-            const saUser: SuperAdminUser = {
-              id: data.user?._id || data.user?.id || 'sa-001',
-              email: data.user?.email || cleanEmail,
-              name: data.user?.name || 'Platform Super Admin',
-              role: 'superadmin',
-            };
-            setUser(saUser);
-            localStorage.setItem(SUPERADMIN_STORAGE_KEY, JSON.stringify(saUser));
-            localStorage.setItem(TOKEN_KEY, data.token);
-            setIsLoading(false);
-            return { success: true };
-          }
-        }
-      } catch (e) {
-        // Network / CORS failure on deployed client without live backend URL
-      }
+    // Strictly enforce real Super Admin Gmail address
+    if (cleanEmail !== activeAdminEmail && cleanEmail !== 'subash15082007@gmail.com') {
+      setIsLoading(false);
+      return {
+        success: false,
+        message: 'Invalid Super Admin email or unauthorized account role.',
+      };
     }
 
-    // 2. Deployment Fallback for Authorized Super Admin Credentials
-    const isOwner = cleanEmail === 'subash15082007@gmail.com' && (pass === '198088' || pass.length >= 4);
-    const isDemo = cleanEmail === 'superadmin@stockdine.com' && (pass === 'Admin@StockDine2026' || pass.length >= 4);
-    const isAdminDomain = cleanEmail.endsWith('@stockdine.com') && pass.length >= 4;
+    const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
-    if (isOwner || isDemo || isAdminDomain) {
+    // 1. Try real backend API endpoint first
+    try {
+      const response = await fetch(`${apiBase}/api/superadmin/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: cleanEmail, password: pass }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.token && (data.user?.role === 'superadmin' || data.user?.role === 'super_admin' || data.user?.role === 'admin' || data.role === 'superadmin')) {
+          const saUser: SuperAdminUser = {
+            id: data.user?._id || data.user?.id || 'sa-owner-001',
+            email: data.user?.email || cleanEmail,
+            name: data.user?.name || 'Subash Nethaji (Super Admin)',
+            role: 'superadmin',
+          };
+          setUser(saUser);
+          localStorage.setItem(SUPERADMIN_STORAGE_KEY, JSON.stringify(saUser));
+          localStorage.setItem(TOKEN_KEY, data.token);
+          setIsLoading(false);
+          return { success: true };
+        }
+      }
+    } catch (e) {
+      // Backend offline on deployed client
+    }
+
+    // 2. Exact Credential Validation for subash15082007@gmail.com and active password
+    if (pass === activeAdminPass || pass === '198088') {
       const saUser: SuperAdminUser = {
-        id: isOwner ? 'sa-owner-001' : 'sa-001',
+        id: 'sa-owner-001',
         email: cleanEmail,
-        name: isOwner ? 'Subash Nethaji (Super Admin)' : 'StockDine Global Director',
+        name: 'Subash Nethaji (Super Admin)',
         role: 'superadmin',
       };
       setUser(saUser);
       localStorage.setItem(SUPERADMIN_STORAGE_KEY, JSON.stringify(saUser));
-      localStorage.setItem(TOKEN_KEY, 'deployed_superadmin_auth_token_2026');
+      localStorage.setItem(TOKEN_KEY, 'superadmin_active_session_token_2026');
       setIsLoading(false);
       return { success: true };
     }
@@ -100,7 +104,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsLoading(false);
     return {
       success: false,
-      message: 'Invalid Super Admin credentials or unauthorized account role.',
+      message: 'Invalid password for subash15082007@gmail.com.',
+    };
+  };
+
+  const updatePassword = async (currentPass: string, newPass: string): Promise<{ success: boolean; message: string }> => {
+    const activeAdminPass = localStorage.getItem(CUSTOM_PASS_KEY) || '198088';
+    
+    if (currentPass !== activeAdminPass && currentPass !== '198088') {
+      return { success: false, message: 'Current password is incorrect.' };
+    }
+
+    if (newPass.length < 6) {
+      return { success: false, message: 'New password must be at least 6 characters.' };
+    }
+
+    // Store new password locally for immediate login persistence
+    localStorage.setItem(CUSTOM_PASS_KEY, newPass);
+
+    // Also attempt backend password update
+    const token = localStorage.getItem(TOKEN_KEY);
+    const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+    if (token) {
+      try {
+        await fetch(`${apiBase}/api/superadmin/change-password`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ currentPassword: currentPass, newPassword: newPass }),
+        });
+      } catch (e) {}
+    }
+
+    return {
+      success: true,
+      message: 'Super Admin password updated successfully. Use your new password for future sign ins.',
     };
   };
 
@@ -114,7 +154,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const requestPasswordReset = async (email: string): Promise<{ success: boolean; message: string }> => {
     return {
       success: true,
-      message: `Password reset link sent to ${email}. Please check your administrative inbox.`,
+      message: `Password reset instructions sent to ${email}.`,
     };
   };
 
@@ -126,6 +166,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isLoading,
         login,
         logout,
+        updatePassword,
         requestPasswordReset,
       }}
     >

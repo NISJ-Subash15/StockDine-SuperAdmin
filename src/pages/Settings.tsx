@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { Settings as SettingsIcon, KeyRound, ShieldCheck, Lock, Bell, User, CheckCircle2, AlertCircle } from 'lucide-react';
 
 export const SettingsPage: React.FC = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, updatePassword } = useAuth();
 
   const [currentPass, setCurrentPass] = useState('');
   const [newPass, setNewPass] = useState('');
@@ -16,7 +16,7 @@ export const SettingsPage: React.FC = () => {
   const [emailAlerts, setEmailAlerts] = useState(true);
   const [cancellationAlerts, setCancellationAlerts] = useState(true);
 
-  const handlePasswordChange = (e: React.FormEvent) => {
+  const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault();
     setPassSuccess('');
     setPassError('');
@@ -25,8 +25,8 @@ export const SettingsPage: React.FC = () => {
       setPassError('Please enter your current administrative password.');
       return;
     }
-    if (newPass.length < 8) {
-      setPassError('New password must be at least 8 characters long.');
+    if (newPass.length < 6) {
+      setPassError('New password must be at least 6 characters long.');
       return;
     }
     if (newPass !== confirmPass) {
@@ -34,10 +34,15 @@ export const SettingsPage: React.FC = () => {
       return;
     }
 
-    setPassSuccess('Super Admin Security Password updated successfully.');
-    setCurrentPass('');
-    setNewPass('');
-    setConfirmPass('');
+    const res = await updatePassword(currentPass, newPass);
+    if (res.success) {
+      setPassSuccess(res.message);
+      setCurrentPass('');
+      setNewPass('');
+      setConfirmPass('');
+    } else {
+      setPassError(res.message);
+    }
   };
 
   return (
