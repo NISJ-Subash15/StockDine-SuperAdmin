@@ -11,66 +11,48 @@ import {
   CheckCircle2,
   XCircle,
   Activity,
-  AlertTriangle,
   ArrowUpRight,
+  RefreshCw,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
-  AreaChart,
-  Area,
-  BarChart,
-  Bar,
   PieChart,
   Pie,
   Cell,
-  XAxis,
-  YAxis,
   Tooltip,
-  CartesianGrid,
 } from 'recharts';
 
 export const Dashboard: React.FC = () => {
   const [telemetry, setTelemetry] = useState<PlatformTelemetry | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  const loadData = async () => {
+    setIsLoading(true);
+    const data = await api.getDashboardTelemetry();
+    setTelemetry(data);
+    setIsLoading(false);
+  };
+
   useEffect(() => {
-    async function loadData() {
-      setIsLoading(true);
-      const data = await api.getDashboardTelemetry();
-      setTelemetry(data);
-      setIsLoading(false);
-    }
     loadData();
   }, []);
 
-  const bookingTrendsData = [
-    { month: 'Jan', bookings: 6200, gmv: 6200000 },
-    { month: 'Feb', bookings: 7800, gmv: 7800000 },
-    { month: 'Mar', bookings: 9400, gmv: 9400000 },
-    { month: 'Apr', bookings: 11200, gmv: 11200000 },
-    { month: 'May', bookings: 14500, gmv: 14500000 },
-    { month: 'Jun', bookings: 18200, gmv: 18200000 },
-    { month: 'Jul', bookings: 22100, gmv: 22100000 },
-  ];
+  const formatCurrency = (val: number) => {
+    if (val >= 10000000) return `₹${(val / 10000000).toFixed(2)} Cr`;
+    if (val >= 100000) return `₹${(val / 100000).toFixed(2)} Lakhs`;
+    return `₹${val.toLocaleString()}`;
+  };
+
+  const completed = telemetry?.completedBookings || 0;
+  const cancelled = telemetry?.cancelledBookings || 0;
+  const total = telemetry?.totalBookings || 0;
+  const confirmed = Math.max(0, total - (completed + cancelled));
 
   const statusDistributionData = [
-    { name: 'Completed', value: 81200, color: '#10B981' },
-    { name: 'Confirmed', value: 2800, color: '#3B82F6' },
-    { name: 'Cancelled', value: 5400, color: '#EF4444' },
-  ];
-
-  const restaurantGrowthData = [
-    { month: 'Jan', count: 180 },
-    { month: 'Feb', count: 210 },
-    { month: 'Mar', count: 245 },
-    { month: 'Apr', count: 280 },
-    { month: 'May', count: 310 },
-    { month: 'Jun', count: 342 },
-  ];
-
-  const formatCurrency = (val: number) => {
-    return `₹${(val / 100000).toFixed(2)}L`;
-  };
+    { name: 'Completed', value: completed, color: '#10B981' },
+    { name: 'Confirmed', value: confirmed, color: '#3B82F6' },
+    { name: 'Cancelled', value: cancelled, color: '#EF4444' },
+  ].filter((d) => d.value > 0 || total === 0);
 
   return (
     <div className="space-y-6">
@@ -86,93 +68,80 @@ export const Dashboard: React.FC = () => {
           </h1>
         </div>
 
-        {telemetry?.isDemoData && (
-          <div className="px-3.5 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-xs font-bold flex items-center gap-1.5 w-fit">
-            <AlertTriangle className="size-3.5 shrink-0" />
-            <span>DEMO / DEVELOPMENT DATA</span>
-          </div>
-        )}
+        <button
+          type="button"
+          onClick={loadData}
+          disabled={isLoading}
+          className="px-4 py-2 rounded-xl bg-card border border-border text-foreground hover:bg-muted text-xs font-bold transition-all flex items-center gap-2 w-fit cursor-pointer shadow-xs"
+        >
+          <RefreshCw className={`size-3.5 ${isLoading ? 'animate-spin' : ''}`} />
+          <span>Refresh Data</span>
+        </button>
       </div>
 
       {/* 8 KPI Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <KPICard
-          title="Total Users"
+          title="Total Diners"
           value={isLoading ? '...' : (telemetry?.totalUsers || 0).toLocaleString()}
-          subtitle="Registered diners"
-          trend="+14.2% mo/mo"
-          trendPositive={true}
+          subtitle="Registered customer accounts"
           icon={<Users className="size-5" />}
         />
         <KPICard
           title="Total Restaurants"
           value={isLoading ? '...' : (telemetry?.totalRestaurants || 0).toLocaleString()}
-          subtitle="Onboarded venues"
-          trend="+8 new this week"
-          trendPositive={true}
+          subtitle="Partner venues in database"
           icon={<Building2 className="size-5" />}
         />
         <KPICard
           title="Active Restaurants"
           value={isLoading ? '...' : (telemetry?.activeRestaurants || 0).toLocaleString()}
-          subtitle="Live accepting bookings"
-          trend="87% active rate"
-          trendPositive={true}
-          icon={<Building2 className="size-5" />}
+          subtitle="Approved accepting bookings"
+          icon={<Building2 className="size-5 text-emerald-500" />}
         />
         <KPICard
           title="Total Bookings"
           value={isLoading ? '...' : (telemetry?.totalBookings || 0).toLocaleString()}
-          subtitle="All time reservations"
-          trend="+18.5% mo/mo"
-          trendPositive={true}
+          subtitle="Reservations logged"
           icon={<Calendar className="size-5" />}
         />
         <KPICard
           title="Completed Bookings"
           value={isLoading ? '...' : (telemetry?.completedBookings || 0).toLocaleString()}
-          subtitle="Fulfillments confirmed"
-          trend="90.8% success"
-          trendPositive={true}
-          icon={<CheckCircle2 className="size-5" />}
+          subtitle="Fulfilled dining reservations"
+          icon={<CheckCircle2 className="size-5 text-emerald-500" />}
         />
         <KPICard
           title="Cancelled Bookings"
           value={isLoading ? '...' : (telemetry?.cancelledBookings || 0).toLocaleString()}
-          subtitle="User & venue cancellations"
-          trend="6.0% cancellation"
-          trendPositive={false}
-          icon={<XCircle className="size-5" />}
+          subtitle="Cancelled reservation count"
+          icon={<XCircle className="size-5 text-rose-500" />}
         />
         <KPICard
           title="Advance Payments"
           value={isLoading ? '...' : formatCurrency(telemetry?.totalAdvancePaid || 0)}
-          subtitle="Platform collected deposit"
-          trend="+22.1% advance volume"
-          trendPositive={true}
+          subtitle="Collected 20% table hold deposit"
           icon={<CreditCard className="size-5" />}
         />
         <KPICard
           title="Platform GMV"
           value={isLoading ? '...' : formatCurrency(telemetry?.platformGMV || 0)}
           subtitle="Gross Merchant Value"
-          trend="₹8.94 Cr lifetime"
-          trendPositive={true}
           icon={<DollarSign className="size-5" />}
         />
       </div>
 
-      {/* Analytics Charts Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 pt-4">
-        {/* GMV & Booking Volume Trend */}
-        <div className="lg:col-span-8 p-6 rounded-3xl bg-card border border-border space-y-4 shadow-sm">
+      {/* Analytics Breakdown Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 pt-2">
+        {/* Real Metrics Summary */}
+        <div className="lg:col-span-8 p-6 rounded-3xl bg-card border border-border space-y-4 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="font-serif font-bold text-xl text-foreground">
-                Platform GMV & Booking Velocity
+                Database Platform Overview
               </h2>
               <p className="text-xs text-muted-foreground">
-                Monthly reservation volume vs Gross Merchant Value
+                Real-time MongoDB platform metric breakdown
               </p>
             </div>
             <div className="p-2 rounded-xl bg-background border border-border text-[#D2D0C1]">
@@ -180,42 +149,35 @@ export const Dashboard: React.FC = () => {
             </div>
           </div>
 
-          <div className="h-72 w-full pt-4">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={bookingTrendsData}>
-                <defs>
-                  <linearGradient id="gmvGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#D2D0C1" stopOpacity={0.4} />
-                    <stop offset="95%" stopColor="#D2D0C1" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
-                <XAxis dataKey="month" stroke="#A3A3A3" fontSize={11} />
-                <YAxis stroke="#A3A3A3" fontSize={11} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: '#2B2B2B',
-                    borderColor: '#444444',
-                    borderRadius: '12px',
-                    color: '#FFFFFF',
-                    fontSize: '12px',
-                  }}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="bookings"
-                  stroke="#D2D0C1"
-                  strokeWidth={2}
-                  fillOpacity={1}
-                  fill="url(#gmvGrad)"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 pt-4 border-t border-border">
+            <div className="p-4 rounded-2xl bg-background border border-border space-y-1">
+              <span className="text-[10px] font-bold uppercase text-muted-foreground">Pending Approvals</span>
+              <div className="text-xl font-serif font-bold text-amber-500">
+                {telemetry?.pendingApprovalRestaurants || 0}
+              </div>
+              <span className="text-[11px] text-muted-foreground">Venues awaiting review</span>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-background border border-border space-y-1">
+              <span className="text-[10px] font-bold uppercase text-muted-foreground">Open Support Tickets</span>
+              <div className="text-xl font-serif font-bold text-foreground">
+                {telemetry?.activeSupportTickets || 0}
+              </div>
+              <span className="text-[11px] text-muted-foreground">Active support inquiries</span>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-background border border-border space-y-1">
+              <span className="text-[10px] font-bold uppercase text-muted-foreground">Total Customer Reviews</span>
+              <div className="text-xl font-serif font-bold text-foreground">
+                {telemetry?.reviewsCount || 0}
+              </div>
+              <span className="text-[11px] text-muted-foreground">Diner ratings submitted</span>
+            </div>
           </div>
         </div>
 
         {/* Booking Status Distribution */}
-        <div className="lg:col-span-4 p-6 rounded-3xl bg-card border border-border space-y-4 shadow-sm flex flex-col justify-between">
+        <div className="lg:col-span-4 p-6 rounded-3xl bg-card border border-border space-y-4 shadow-xs flex flex-col justify-between">
           <div>
             <h2 className="font-serif font-bold text-xl text-foreground">
               Booking Health Breakdown
@@ -225,44 +187,52 @@ export const Dashboard: React.FC = () => {
             </p>
           </div>
 
-          <div className="h-56 w-full flex items-center justify-center">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={statusDistributionData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={55}
-                  outerRadius={80}
-                  paddingAngle={5}
-                  dataKey="value"
-                >
-                  {statusDistributionData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: '#2B2B2B',
-                    borderColor: '#444444',
-                    borderRadius: '12px',
-                    color: '#FFFFFF',
-                    fontSize: '12px',
-                  }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-
-          <div className="grid grid-cols-3 gap-2 pt-2 border-t border-border text-center text-xs">
-            {statusDistributionData.map((item) => (
-              <div key={item.name} className="space-y-0.5">
-                <span className="size-2.5 rounded-full inline-block mr-1" style={{ backgroundColor: item.color }} />
-                <span className="text-muted-foreground block text-[10px] uppercase font-bold">{item.name}</span>
-                <span className="font-bold text-foreground block">{item.value.toLocaleString()}</span>
+          {total === 0 ? (
+            <div className="h-48 flex items-center justify-center text-xs text-muted-foreground font-semibold">
+              No booking records logged in database.
+            </div>
+          ) : (
+            <>
+              <div className="h-48 w-full flex items-center justify-center">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={statusDistributionData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={45}
+                      outerRadius={70}
+                      paddingAngle={4}
+                      dataKey="value"
+                    >
+                      {statusDistributionData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: '#202020',
+                        borderColor: '#333333',
+                        borderRadius: '12px',
+                        color: '#FFFFFF',
+                        fontSize: '12px',
+                      }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
               </div>
-            ))}
-          </div>
+
+              <div className="grid grid-cols-3 gap-2 pt-2 border-t border-border text-center text-xs">
+                {statusDistributionData.map((item) => (
+                  <div key={item.name} className="space-y-0.5">
+                    <span className="size-2.5 rounded-full inline-block mr-1" style={{ backgroundColor: item.color }} />
+                    <span className="text-muted-foreground block text-[10px] uppercase font-bold">{item.name}</span>
+                    <span className="font-bold text-foreground block">{item.value.toLocaleString()}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>

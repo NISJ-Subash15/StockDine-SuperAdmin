@@ -41,20 +41,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (email: string, pass: string): Promise<{ success: boolean; message?: string }> => {
     setIsLoading(true);
     const cleanEmail = email.trim().toLowerCase();
+    const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
-    // Try live backend API login
-    try {
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'}/api/auth/superadmin/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: cleanEmail, password: pass }),
-      });
-      if (response.ok) {
+    // Call real backend Super Admin API endpoints
+    const endpoints = [
+      `${apiBase}/api/superadmin/login`,
+      `${apiBase}/api/auth/superadmin/login`
+    ];
+
+    let lastErrorMsg = 'Invalid Super Admin credentials or unauthorized account role.';
+
+    for (const endpoint of endpoints) {
+      try {
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: cleanEmail, password: pass }),
+        });
+
         const data = await response.json();
-        if (data.token && (data.user?.role === 'superadmin' || data.role === 'superadmin')) {
+
+        if (response.ok && data.token && (data.user?.role === 'superadmin' || data.user?.role === 'super_admin' || data.user?.role === 'admin' || data.role === 'superadmin')) {
           const saUser: SuperAdminUser = {
-            id: data.user?._id || data.user?.id || 'sa-101',
-            email: cleanEmail,
+            id: data.user?._id || data.user?.id || 'sa-001',
+            email: data.user?.email || cleanEmail,
             name: data.user?.name || 'Platform Super Admin',
             role: 'superadmin',
           };
@@ -63,32 +73,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           localStorage.setItem(TOKEN_KEY, data.token);
           setIsLoading(false);
           return { success: true };
+        } else if (data.message) {
+          lastErrorMsg = data.message;
         }
+      } catch (e: any) {
+        lastErrorMsg = e.message || 'Unable to connect to StockDine backend API server.';
       }
-    } catch (e) {}
-
-    // Secure Super Admin Demo & Owner Credentials Fallback
-    const isOwnerAccount = cleanEmail === 'subash15082007@gmail.com' && (pass === '198088' || pass.length >= 4);
-    const isDemoAccount = cleanEmail === 'superadmin@stockdine.com' && pass === 'Admin@StockDine2026';
-
-    if (isOwnerAccount || isDemoAccount) {
-      const saUser: SuperAdminUser = {
-        id: isOwnerAccount ? 'sa-owner-001' : 'sa-001',
-        email: cleanEmail,
-        name: isOwnerAccount ? 'Subash Nethaji (Super Admin)' : 'StockDine Global Director',
-        role: 'superadmin',
-      };
-      setUser(saUser);
-      localStorage.setItem(SUPERADMIN_STORAGE_KEY, JSON.stringify(saUser));
-      localStorage.setItem(TOKEN_KEY, 'superadmin_jwt_auth_token_2026');
-      setIsLoading(false);
-      return { success: true };
     }
 
     setIsLoading(false);
     return {
       success: false,
-      message: 'Invalid Super Admin credentials or unauthorized account role.',
+      message: lastErrorMsg,
     };
   };
 

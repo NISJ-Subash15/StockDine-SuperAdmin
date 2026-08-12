@@ -1,34 +1,46 @@
-import React from 'react';
-import { BarChart3, TrendingUp, Users, Building2, Calendar, Award, Utensils, Percent } from 'lucide-react';
-import {
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  CartesianGrid,
-  LineChart,
-  Line,
-} from 'recharts';
+import React, { useEffect, useState } from 'react';
+import { api } from '../lib/api';
+import { PlatformTelemetry, Restaurant } from '../types';
+import { BarChart3, Users, Building2, Utensils, Award } from 'lucide-react';
 
 export const AnalyticsPage: React.FC = () => {
-  const userGrowthData = [
-    { month: 'Jan', users: 8400 },
-    { month: 'Feb', users: 9600 },
-    { month: 'Mar', users: 11000 },
-    { month: 'Apr', users: 12400 },
-    { month: 'May', users: 13800 },
-    { month: 'Jun', users: 14850 },
-  ];
+  const [telemetry, setTelemetry] = useState<PlatformTelemetry | null>(null);
+  const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const categoryPopularityData = [
-    { category: 'North Indian', bookings: 28400 },
-    { category: 'Italian & Pizza', bookings: 22100 },
-    { category: 'Asian & Sushi', bookings: 16500 },
-    { category: 'Biryani & Kebabs', bookings: 14200 },
-    { category: 'Continental & BBQ', bookings: 8200 },
-  ];
+  useEffect(() => {
+    async function loadData() {
+      setIsLoading(true);
+      const [t, r] = await Promise.all([
+        api.getDashboardTelemetry(),
+        api.getRestaurants(),
+      ]);
+      setTelemetry(t);
+      setRestaurants(r);
+      setIsLoading(false);
+    }
+    loadData();
+  }, []);
+
+  const totalB = telemetry?.totalBookings || 0;
+  const compB = telemetry?.completedBookings || 0;
+  const cancB = telemetry?.cancelledBookings || 0;
+
+  const completionRate = totalB > 0 ? ((compB / totalB) * 100).toFixed(1) : '0';
+  const cancellationRate = totalB > 0 ? ((cancB / totalB) * 100).toFixed(1) : '0';
+  const avgAdvance = totalB > 0 ? Math.round((telemetry?.totalAdvancePaid || 0) / totalB) : 0;
+
+  // Cuisine category aggregation from real restaurants database
+  const cuisineCounts: Record<string, number> = {};
+  restaurants.forEach((rest) => {
+    const c = rest.cuisine || 'Other';
+    cuisineCounts[c] = (cuisineCounts[c] || 0) + (rest.totalBookings || 1);
+  });
+
+  const categoryData = Object.entries(cuisineCounts).map(([category, bookings]) => ({
+    category,
+    bookings,
+  }));
 
   return (
     <div className="space-y-6">
@@ -37,10 +49,10 @@ export const AnalyticsPage: React.FC = () => {
         <div>
           <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground uppercase tracking-widest">
             <BarChart3 className="size-4 text-[#D2D0C1]" />
-            <span>Platform Deep Telemetry</span>
+            <span>Platform Telemetry</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-serif font-bold text-foreground mt-1">
-            Global Analytics & Growth Intelligence
+            Global Analytics & Database Intelligence
           </h1>
         </div>
       </div>
@@ -49,91 +61,114 @@ export const AnalyticsPage: React.FC = () => {
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <div className="p-5 rounded-2xl bg-card border border-border space-y-1">
           <span className="text-[10px] font-bold text-muted-foreground uppercase">Completion Rate</span>
-          <div className="text-2xl font-serif font-bold text-emerald-500">90.8%</div>
-          <span className="text-[11px] text-muted-foreground">81,200 fulfillments</span>
+          <div className="text-2xl font-serif font-bold text-emerald-500">
+            {isLoading ? '...' : `${completionRate}%`}
+          </div>
+          <span className="text-[11px] text-muted-foreground">{compB.toLocaleString()} fulfillments</span>
         </div>
 
         <div className="p-5 rounded-2xl bg-card border border-border space-y-1">
           <span className="text-[10px] font-bold text-muted-foreground uppercase">Cancellation Rate</span>
-          <div className="text-2xl font-serif font-bold text-rose-500">6.0%</div>
-          <span className="text-[11px] text-muted-foreground">5,400 cancellations</span>
+          <div className="text-2xl font-serif font-bold text-rose-500">
+            {isLoading ? '...' : `${cancellationRate}%`}
+          </div>
+          <span className="text-[11px] text-muted-foreground">{cancB.toLocaleString()} cancellations</span>
         </div>
 
         <div className="p-5 rounded-2xl bg-card border border-border space-y-1">
           <span className="text-[10px] font-bold text-muted-foreground uppercase">Avg Advance / Booking</span>
-          <div className="text-2xl font-serif font-bold text-foreground">₹200</div>
-          <span className="text-[11px] text-muted-foreground">20% table hold deposit</span>
+          <div className="text-2xl font-serif font-bold text-foreground">
+            {isLoading ? '...' : `₹${avgAdvance}`}
+          </div>
+          <span className="text-[11px] text-muted-foreground">Calculated from deposit records</span>
         </div>
 
         <div className="p-5 rounded-2xl bg-card border border-border space-y-1">
-          <span className="text-[10px] font-bold text-muted-foreground uppercase">Venue Retention Rate</span>
-          <div className="text-2xl font-serif font-bold text-foreground">96.4%</div>
-          <span className="text-[11px] text-muted-foreground">Monthly active partner venues</span>
+          <span className="text-[10px] font-bold text-muted-foreground uppercase">Active Partner Venues</span>
+          <div className="text-2xl font-serif font-bold text-foreground">
+            {isLoading ? '...' : (telemetry?.activeRestaurants || 0)}
+          </div>
+          <span className="text-[11px] text-muted-foreground">Approved active venues</span>
         </div>
       </div>
 
-      {/* Analytics Charts */}
+      {/* Category & Venue Breakdown */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* User Growth Line Chart */}
         <div className="lg:col-span-6 p-6 rounded-3xl bg-card border border-border space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="font-serif font-bold text-xl text-foreground">User Growth Velocity</h2>
-              <p className="text-xs text-muted-foreground">Cumulative registered diner accounts</p>
-            </div>
-            <Users className="size-5 text-[#D2D0C1]" />
-          </div>
-
-          <div className="h-64 w-full pt-4">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={userGrowthData}>
-                <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
-                <XAxis dataKey="month" stroke="#A3A3A3" fontSize={11} />
-                <YAxis stroke="#A3A3A3" fontSize={11} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: '#2B2B2B',
-                    borderColor: '#444444',
-                    borderRadius: '12px',
-                    color: '#FFFFFF',
-                    fontSize: '12px',
-                  }}
-                />
-                <Line type="monotone" dataKey="users" stroke="#D2D0C1" strokeWidth={3} dot={{ fill: '#D2D0C1', r: 4 }} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* Category Popularity Bar Chart */}
-        <div className="lg:col-span-6 p-6 rounded-3xl bg-card border border-border space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="font-serif font-bold text-xl text-foreground">Cuisine Category Popularity</h2>
-              <p className="text-xs text-muted-foreground">Total reservations per food category</p>
+              <h2 className="font-serif font-bold text-xl text-foreground">Cuisine Category Distribution</h2>
+              <p className="text-xs text-muted-foreground">Aggregated from active venue database</p>
             </div>
             <Utensils className="size-5 text-[#D2D0C1]" />
           </div>
 
-          <div className="h-64 w-full pt-4">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={categoryPopularityData}>
-                <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
-                <XAxis dataKey="category" stroke="#A3A3A3" fontSize={10} />
-                <YAxis stroke="#A3A3A3" fontSize={11} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: '#2B2B2B',
-                    borderColor: '#444444',
-                    borderRadius: '12px',
-                    color: '#FFFFFF',
-                    fontSize: '12px',
-                  }}
-                />
-                <Bar dataKey="bookings" fill="#D2D0C1" radius={[8, 8, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+          {isLoading ? (
+            <div className="p-12 text-center text-xs text-muted-foreground font-bold">
+              Loading category analytics...
+            </div>
+          ) : categoryData.length === 0 ? (
+            <div className="p-12 text-center text-xs text-muted-foreground font-semibold">
+              No restaurant cuisine data registered in database yet.
+            </div>
+          ) : (
+            <div className="space-y-3 pt-2">
+              {categoryData.map((cat) => (
+                <div key={cat.category} className="space-y-1">
+                  <div className="flex justify-between text-xs font-bold">
+                    <span className="text-foreground">{cat.category}</span>
+                    <span className="text-muted-foreground">{cat.bookings} venue(s)</span>
+                  </div>
+                  <div className="w-full h-2 rounded-full bg-background overflow-hidden border border-border">
+                    <div
+                      className="h-full bg-[#D2D0C1]"
+                      style={{
+                        width: `${Math.min(100, (cat.bookings / Math.max(1, restaurants.length)) * 100)}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="lg:col-span-6 p-6 rounded-3xl bg-card border border-border space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="font-serif font-bold text-xl text-foreground">Top Onboarded Venues</h2>
+              <p className="text-xs text-muted-foreground">Ranked by database reservation volume</p>
+            </div>
+            <Award className="size-5 text-[#D2D0C1]" />
           </div>
+
+          {isLoading ? (
+            <div className="p-12 text-center text-xs text-muted-foreground font-bold">
+              Loading venue telemetry...
+            </div>
+          ) : restaurants.length === 0 ? (
+            <div className="p-12 text-center text-xs text-muted-foreground font-semibold">
+              No restaurants registered yet.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {restaurants.slice(0, 5).map((r) => (
+                <div
+                  key={r.id}
+                  className="p-3.5 rounded-2xl bg-background border border-border flex items-center justify-between text-xs"
+                >
+                  <div>
+                    <span className="font-bold text-foreground block">{r.name}</span>
+                    <span className="text-[11px] text-muted-foreground block">{r.city} • {r.cuisine}</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="font-bold text-foreground block">{r.totalBookings} Bookings</span>
+                    <span className="text-[10px] text-emerald-500 font-semibold uppercase">{r.status}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>
