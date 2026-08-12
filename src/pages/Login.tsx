@@ -160,8 +160,9 @@ export const Login: React.FC = () => {
               </button>
             </form>
 
-            <div className="pt-4 border-t border-border text-center text-[11px] text-muted-foreground">
-              Demo Credentials: <span className="font-mono text-foreground font-bold">superadmin@stockdine.com</span> / <span className="font-mono text-foreground font-bold">Admin@StockDine2026</span>
+            <div className="pt-4 border-t border-border text-center text-[11px] text-muted-foreground space-y-1">
+              <div>Super Admin Credentials: <span className="font-mono text-foreground font-bold">subash15082007@gmail.com</span> / <span className="font-mono text-foreground font-bold">198088</span></div>
+              <div className="text-[10px] text-muted-foreground/80">Alternate Demo: <span className="font-mono text-foreground font-bold">superadmin@stockdine.com</span> / <span className="font-mono text-foreground font-bold">Admin@StockDine2026</span></div>
             </div>
           </div>
         </div>
