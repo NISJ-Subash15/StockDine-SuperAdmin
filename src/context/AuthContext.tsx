@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { SuperAdminUser } from '../types';
+import { getApiBaseUrl } from '../lib/api';
 
 interface AuthContextType {
   user: SuperAdminUser | null;
@@ -56,17 +57,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       };
     }
 
-    const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+    const apiBase = getApiBaseUrl();
 
     // 1. Try real backend API endpoint first
     try {
-      const response = await fetch(`${apiBase}/api/superadmin/login`, {
+      const loginUrl = `${apiBase}/api/superadmin/login`;
+      let response = await fetch(loginUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: cleanEmail, password: pass }),
-      });
+      }).catch(() => null);
 
-      if (response.ok) {
+      if (!response && typeof window !== 'undefined' && window.location && !['localhost', '127.0.0.1'].includes(window.location.hostname)) {
+        response = await fetch(`https://stockdine-backend.onrender.com/api/superadmin/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: cleanEmail, password: pass }),
+        }).catch(() => null);
+      }
+
+      if (response && response.ok) {
         const data = await response.json();
         if (data.token && (data.user?.role === 'superadmin' || data.user?.role === 'super_admin' || data.user?.role === 'admin' || data.role === 'superadmin')) {
           const saUser: SuperAdminUser = {
@@ -124,7 +134,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Also attempt backend password update
     const token = localStorage.getItem(TOKEN_KEY);
-    const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+    const apiBase = getApiBaseUrl();
     if (token) {
       try {
         await fetch(`${apiBase}/api/superadmin/change-password`, {
